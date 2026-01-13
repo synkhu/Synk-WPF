@@ -5,27 +5,81 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Dashboard"
         mc:Ignorable="d"
-        Title="Dashboard" Height="450" Width="800">
+        Title="User management" Height="450" Width="800"
+        Background="#2d1b4e">
+    <Window.Resources>
+        <Style x:Key="RoundedButton" TargetType="Button">
+            <Setter Property="Height" Value="25"/>
+            <Setter Property="Width" Value="100"/>
+            <Setter Property="Margin" Value="10"/>
+            <Setter Property="Background" Value="#7c3aed"/>
+            <Setter Property="BorderBrush" Value="#463956"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="DemiBold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="1*"/>
             <RowDefinition Height="7*"/>
         </Grid.RowDefinitions>
-        <StackPanel Orientation="Horizontal">
-            <Label FontSize="15" Margin="10">Search for users:</Label>
-            <TextBox Height="25" Width="200"/>
-            <StackPanel Width="315"/>
-            <Button Height="25" Width="100" Margin="10">Logout</Button>
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
+            <Label FontSize="15" Margin="10" Foreground="White">Search for users:</Label>
+            <TextBox Height="25" Width="200" Background="#1a0f2e" BorderBrush="#463956" Foreground="White" Padding="3">
+                <TextBox.Template>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ScrollViewer x:Name="PART_ContentHost"/>
+                        </Border>
+                    </ControlTemplate>
+                </TextBox.Template>
+            </TextBox>
+            <StackPanel Width="210"/>
+            <Button Style="{StaticResource RoundedButton}">Save changes</Button>
+            <Button Style="{StaticResource RoundedButton}">Logout</Button>
         </StackPanel>
-        <GroupBox Margin="5" Padding="5" Header="Users" Grid.Row="1">
-            <DataGrid Grid.Row="1" x:Name="dataGrid" HeadersVisibility="Column" AutoGenerateColumns="False">
+        <GroupBox Margin="5" Padding="5" Grid.Row="1" Header="Users" Foreground="White" FontSize="14">
+            <GroupBox.Template>
+                <ControlTemplate TargetType="GroupBox">
+                    <Border BorderBrush="#463956" BorderThickness="2" CornerRadius="6" Background="#1a0f2e" Padding="10">
+                        <DockPanel>
+                            <TextBlock Text="{TemplateBinding Header}"
+                                       Foreground="{TemplateBinding Foreground}"
+                                       FontSize="{TemplateBinding FontSize}"
+                                       FontWeight="Normal"
+                                       DockPanel.Dock="Top"
+                                       Margin="0,0,0,5"/>
+                            <ContentPresenter/>
+                        </DockPanel>
+                    </Border>
+                </ControlTemplate>
+            </GroupBox.Template>
+            <DataGrid x:Name="dataGrid" HeadersVisibility="Column" AutoGenerateColumns="False" Background="#463956" Foreground="White" BorderBrush="black" SelectionChanged="dataGrid_SelectionChanged">
                 <DataGrid.ColumnHeaderStyle>
                     <Style TargetType="DataGridColumnHeader">
                         <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                        <Setter Property="Background" Value="#2d1b4e"/>
+                        <Setter Property="Foreground" Value="White"/>
                     </Style>
                 </DataGrid.ColumnHeaderStyle>
                 <DataGrid.Columns>
-                    <DataGridTextColumn Width="*" Header="Fisrt Name" Binding="{Binding FirstName}"/>
+                    <DataGridTextColumn Width="*" Header="First Name" Binding="{Binding FirstName}"/>
                     <DataGridTextColumn Width="*" Header="Last Name" Binding="{Binding LastName}"/>
                     <DataGridTextColumn Width="*" Header="Email" Binding="{Binding Email}"/>
                     <DataGridTextColumn Width="*" Header="Role" Binding="{Binding Role}"/>
