@@ -70,7 +70,7 @@
                     </Border>
                 </ControlTemplate>
             </GroupBox.Template>
-            <DataGrid x:Name="dataGrid" HeadersVisibility="Column" AutoGenerateColumns="False" Background="#463956" Foreground="White" BorderBrush="black">
+            <DataGrid x:Name="dataGrid" HeadersVisibility="Column" AutoGenerateColumns="False" Background="#463956" Foreground="White" BorderBrush="black" CanUserAddRows="False">
                 <DataGrid.ColumnHeaderStyle>
                     <Style TargetType="DataGridColumnHeader">
                         <Setter Property="HorizontalContentAlignment" Value="Center"/>
@@ -78,6 +78,12 @@
                         <Setter Property="Foreground" Value="White"/>
                     </Style>
                 </DataGrid.ColumnHeaderStyle>
+                <DataGrid.CellStyle>
+                    <Style TargetType="DataGridCell">
+                        <Setter Property="Background" Value="#1a0f2e"/>
+                        <Setter Property="BorderBrush" Value="#463956"/>
+                    </Style>
+                </DataGrid.CellStyle>
                 <DataGrid.Columns>
                     <DataGridTextColumn Width="*" Header="First Name" Binding="{Binding FirstName}"/>
                     <DataGridTextColumn Width="*" Header="Last Name" Binding="{Binding LastName}"/>
