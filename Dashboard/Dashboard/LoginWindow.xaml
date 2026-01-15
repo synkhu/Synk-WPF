@@ -10,46 +10,49 @@
     <Grid>
         <StackPanel Orientation="Vertical">
             <Label FontSize="35" FontWeight="DemiBold" HorizontalAlignment="Center" Margin="25" Foreground="#fff">User management</Label>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5">
                 <Label FontSize="25" Margin="10" Foreground="#fff">Email:</Label>
-                <TextBox Height="35" Width="250" Background="#1a0f2e" BorderBrush="#463956" Foreground="White" Padding="5">
+                <TextBox x:Name="EmailTextBox" Height="35" Width="250" Background="#1a0f2e" BorderBrush="#463956" Foreground="White" Padding="5">
                     <TextBox.Template>
                         <ControlTemplate TargetType="TextBox">
                             <Border Background="{TemplateBinding Background}" 
-                                BorderBrush="{TemplateBinding BorderBrush}" 
-                                BorderThickness="{TemplateBinding BorderThickness}" 
-                                CornerRadius="6"
-                                Padding="{TemplateBinding Padding}">
+                                    BorderBrush="{TemplateBinding BorderBrush}" 
+                                    BorderThickness="{TemplateBinding BorderThickness}" 
+                                    CornerRadius="6"
+                                    Padding="{TemplateBinding Padding}">
                                 <ScrollViewer x:Name="PART_ContentHost"/>
                             </Border>
                         </ControlTemplate>
                     </TextBox.Template>
                 </TextBox>
             </StackPanel>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5">
                 <Label FontSize="25" Margin="10" Foreground="#fff">Password:</Label>
-                <PasswordBox Height="35" Width="200" Background="#1a0f2e" BorderBrush="#463956">
+                <PasswordBox x:Name="PasswordBox" Height="35" Width="200" Background="#1a0f2e" BorderBrush="#463956">
                     <PasswordBox.Template>
                         <ControlTemplate TargetType="PasswordBox">
                             <Border Background="{TemplateBinding Background}" 
-                                BorderBrush="{TemplateBinding BorderBrush}" 
-                                BorderThickness="{TemplateBinding BorderThickness}" 
-                                CornerRadius="6"
-                                Padding="5">
+                                    BorderBrush="{TemplateBinding BorderBrush}" 
+                                    BorderThickness="{TemplateBinding BorderThickness}" 
+                                    CornerRadius="6"
+                                    Padding="5">
                                 <ScrollViewer x:Name="PART_ContentHost"/>
                             </Border>
                         </ControlTemplate>
                     </PasswordBox.Template>
                 </PasswordBox>
             </StackPanel>
-            <Button Height="35" Width="150" FontSize="20" FontWeight="DemiBold" Margin="20"
-                Background="#7c3aed" BorderBrush="#463956" Foreground="#fff">
+
+            <Button x:Name="LoginButton" Height="35" Width="150" FontSize="20" FontWeight="DemiBold" Margin="20"
+                Background="#7c3aed" BorderBrush="#463956" Foreground="#fff" Click="LoginButton_Click">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}" 
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}" 
-                            CornerRadius="6">
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                CornerRadius="6">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                     </ControlTemplate>

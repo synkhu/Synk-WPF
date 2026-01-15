@@ -52,7 +52,7 @@
             </TextBox>
             <StackPanel Width="210"/>
             <Button Style="{StaticResource RoundedButton}">Save changes</Button>
-            <Button Style="{StaticResource RoundedButton}">Logout</Button>
+            <Button x:Name="LogoutButton" Style="{StaticResource RoundedButton}">Logout</Button>
         </StackPanel>
         <GroupBox Margin="5" Padding="5" Grid.Row="1" Header="Users" Foreground="White" FontSize="14">
             <GroupBox.Template>
@@ -70,7 +70,7 @@
                     </Border>
                 </ControlTemplate>
             </GroupBox.Template>
-            <DataGrid x:Name="dataGrid" HeadersVisibility="Column" AutoGenerateColumns="False" Background="#463956" Foreground="White" BorderBrush="black" SelectionChanged="dataGrid_SelectionChanged">
+            <DataGrid x:Name="dataGrid" HeadersVisibility="Column" AutoGenerateColumns="False" Background="#463956" Foreground="White" BorderBrush="black">
                 <DataGrid.ColumnHeaderStyle>
                     <Style TargetType="DataGridColumnHeader">
                         <Setter Property="HorizontalContentAlignment" Value="Center"/>
