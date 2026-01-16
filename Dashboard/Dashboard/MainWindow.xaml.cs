@@ -1,17 +1,8 @@
-﻿using System.Text;
-using System;
-using System.Net.Http;
+﻿using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 using Newtonsoft.Json;
 
 namespace Dashboard
@@ -22,12 +13,15 @@ namespace Dashboard
     public partial class MainWindow : Window
     {
         private bool IsLoggingOut = false;
+        private CollectionViewSource _usersViewSource;
+        public List<string> Roles { get; } = new List<string> { "Administrator", "Customer", "Organiser" };
 
         public MainWindow()
         {
             InitializeComponent();
             LogoutButton.Click += LogoutButton_Click;
             Closed += MainWindow_Closed;
+            SearchBox.TextChanged += SearchBox_TextChanged;
             _ = LoadUsersAsync();
         }
 
@@ -115,13 +109,45 @@ namespace Dashboard
                 var usersResponse = await GetUsersAsync(token);
                 if (usersResponse != null && usersResponse.Items != null)
                 {
-                    dataGrid.ItemsSource = usersResponse.Items;
+                    _usersViewSource = new CollectionViewSource();
+                    _usersViewSource.Source = usersResponse.Items;
+                    dataGrid.ItemsSource = _usersViewSource.View;
                 }
             }
             else
             {
                 MessageBox.Show("No authentication token available. Please log in.");
             }
+        }
+
+        private void FilterUsers(string searchText)
+        {
+            if (_usersViewSource?.View != null)
+            {
+                _usersViewSource.View.Filter = item =>
+                {
+                    if (string.IsNullOrWhiteSpace(searchText)) return true;
+                    var user = item as User;
+                    if (user == null) return false;
+
+                    var searchTerms = searchText.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                                                .Select(term => term.Trim())
+                                                .Where(term => !string.IsNullOrEmpty(term))
+                                                .ToArray();
+
+                    if (searchTerms.Length == 0) return true;
+
+                    return searchTerms.All(term =>
+                        user.FirstName.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                        user.LastName.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                        user.Email.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                        user.Role.Contains(term, StringComparison.OrdinalIgnoreCase));
+                };
+            }
+        }
+        private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            FilterUsers(SearchBox.Text);
         }
     }
 

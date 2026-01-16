@@ -37,7 +37,7 @@
         </Grid.RowDefinitions>
         <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
             <Label FontSize="15" Margin="10" Foreground="White">Search for users:</Label>
-            <TextBox Height="25" Width="200" Background="#1a0f2e" BorderBrush="#463956" Foreground="White" Padding="3">
+            <TextBox x:Name="SearchBox" Height="25" Width="200" Background="#1a0f2e" BorderBrush="#463956" Foreground="White" Padding="3">
                 <TextBox.Template>
                     <ControlTemplate TargetType="TextBox">
                         <Border Background="{TemplateBinding Background}" 
@@ -82,13 +82,39 @@
                     <Style TargetType="DataGridCell">
                         <Setter Property="Background" Value="#1a0f2e"/>
                         <Setter Property="BorderBrush" Value="#463956"/>
+                        <Setter Property="Foreground" Value="White"/>
                     </Style>
                 </DataGrid.CellStyle>
+                <DataGrid.Resources>
+                    <Style x:Key="ComboBoxItemStyle" TargetType="ComboBoxItem">
+                        <Setter Property="Foreground" Value="White"/>
+                        <Setter Property="Background" Value="#1a0f2e"/>
+                    </Style>
+                    <Style x:Key="RoleComboBoxStyle" TargetType="ComboBox">
+                        <Setter Property="Foreground" Value="White"/>
+                        <Setter Property="Background" Value="#1a0f2e"/>
+                        <Setter Property="BorderBrush" Value="#463956"/>
+                        <Setter Property="ItemContainerStyle" Value="{StaticResource ComboBoxItemStyle}"/>
+                    </Style>
+                </DataGrid.Resources>
                 <DataGrid.Columns>
                     <DataGridTextColumn Width="*" Header="First Name" Binding="{Binding FirstName}"/>
                     <DataGridTextColumn Width="*" Header="Last Name" Binding="{Binding LastName}"/>
                     <DataGridTextColumn Width="*" Header="Email" Binding="{Binding Email}"/>
-                    <DataGridTextColumn Width="*" Header="Role" Binding="{Binding Role}"/>
+                    <DataGridTemplateColumn Width="*" Header="Role">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Role}" Foreground="White" Background="#1a0f2e"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                        <DataGridTemplateColumn.CellEditingTemplate>
+                            <DataTemplate>
+                                <ComboBox SelectedItem="{Binding Role, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" 
+                              ItemsSource="{Binding RelativeSource={RelativeSource AncestorType=Window}, Path=Roles}" 
+                              Style="{StaticResource RoleComboBoxStyle}"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellEditingTemplate>
+                    </DataGridTemplateColumn>
                 </DataGrid.Columns>
             </DataGrid>
         </GroupBox>
