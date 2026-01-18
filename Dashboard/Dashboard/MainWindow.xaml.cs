@@ -25,6 +25,21 @@ namespace Dashboard
             _ = LoadUsersAsync();
         }
 
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            this.WindowState = WindowState.Minimized;
+        }
+
+        private void CloseButton_Click(object sender, RoutedEventArgs e)
+        {
+            this.Close();
+        }
+
+        private void TitleBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            this.DragMove();
+        }
+
         private async void LogoutButton_Click(object sender, RoutedEventArgs e)
         {
             string token = App.Current.Properties["AuthToken"] as string;
