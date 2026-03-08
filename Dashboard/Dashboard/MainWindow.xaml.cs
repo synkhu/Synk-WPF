@@ -14,7 +14,7 @@ namespace Dashboard
     {
         private bool IsLoggingOut = false;
         private CollectionViewSource _usersViewSource;
-        public List<string> Roles { get; } = new List<string> { "Administrator", "Customer", "Organiser" };
+        public List<string> Roles { get; } = new List<string> { "Administrator", "Customer", "Organizer" };
 
         public MainWindow()
         {
@@ -22,6 +22,7 @@ namespace Dashboard
             LogoutButton.Click += LogoutButton_Click;
             Closed += MainWindow_Closed;
             SearchBox.TextChanged += SearchBox_TextChanged;
+            SaveButton.Click += SaveButton_Click;
             _ = LoadUsersAsync();
         }
 
@@ -163,6 +164,79 @@ namespace Dashboard
         private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             FilterUsers(SearchBox.Text);
+        }
+
+        private async void SaveButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (dataGrid.SelectedItem is User selectedUser)
+            {
+                bool success = await SaveUserAsync(selectedUser);
+                if (success)
+                {
+                    _usersViewSource?.View.Refresh();
+                }
+            }
+            else
+            {
+                MessageBox.Show("Please select a user to save.");
+            }
+        }
+
+        private async Task<bool> SaveUserAsync(User user)
+        {
+            string token = App.Current.Properties["AuthToken"] as string;
+            if (string.IsNullOrEmpty(token) || user == null)
+            {
+                MessageBox.Show("No token or user selected.");
+                return false;
+            }
+
+            using var client = new HttpClient();
+            client.BaseAddress = new Uri("https://api.synk.hu/");
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+            var userPatch = new
+            {
+                firstName = user.FirstName,
+                lastName = user.LastName,
+                email = user.Email,
+                profilePictureUrl = user.ProfilePictureUrl,
+                role = user.Role
+            };
+
+            var json = JsonConvert.SerializeObject(userPatch);
+            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+            try
+            {
+                var response = await client.PatchAsync($"users/{user.Id}", content);
+                if (response.IsSuccessStatusCode)
+                {
+                    MessageBox.Show("User saved successfully!");
+                    return true;
+                }
+                else
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    MessageBox.Show("Failed to save user: " + error);
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error saving user: " + ex.Message);
+                return false;
+            }
+        }
+    }
+
+    public static class HttpClientExtensions
+    {
+        public static Task<HttpResponseMessage> PatchAsync(this HttpClient client, string requestUri, HttpContent content)
+        {
+            var request = new HttpRequestMessage(new HttpMethod("PATCH"), requestUri) { Content = content };
+            return client.SendAsync(request);
         }
     }
 
