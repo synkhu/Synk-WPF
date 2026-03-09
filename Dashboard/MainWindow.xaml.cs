@@ -14,7 +14,7 @@ namespace Dashboard
     {
         private bool IsLoggingOut = false;
         private CollectionViewSource _usersViewSource;
-        public List<string> Roles { get; } = new List<string> { "Administrator", "Customer", "Organizer" };
+        public List<string> Roles { get; } = new List<string> { "Administrator", "Organizer", "Customer" };
 
         public MainWindow()
         {
@@ -28,17 +28,17 @@ namespace Dashboard
 
         private void MinimizeButton_Click(object sender, RoutedEventArgs e)
         {
-            this.WindowState = WindowState.Minimized;
+            WindowState = WindowState.Minimized;
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            this.Close();
+            Close();
         }
 
         private void TitleBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            this.DragMove();
+            DragMove();
         }
 
         private async void LogoutButton_Click(object sender, RoutedEventArgs e)
@@ -54,12 +54,13 @@ namespace Dashboard
             App.Current.Properties["TokenExpires"] = null;
 
             IsLoggingOut = true;
-            this.Close();
+            Close();
         }
 
         private async void MainWindow_Closed(object sender, EventArgs e)
         {
             string token = App.Current.Properties["AuthToken"] as string;
+
             if (!string.IsNullOrEmpty(token))
             {
                 await LogoutFromServerAsync(token);
@@ -82,12 +83,14 @@ namespace Dashboard
         private async Task LogoutFromServerAsync(string token)
         {
             using var client = new HttpClient();
+
             client.BaseAddress = new Uri("https://api.synk.hu/");
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", token);
 
             try
             {
-                var response = await client.PostAsync("auth/logout", null);
+                await client.PostAsync("auth/logout", null);
             }
             catch (Exception ex)
             {
@@ -98,16 +101,21 @@ namespace Dashboard
         private async Task<UsersResponse> GetUsersAsync(string token)
         {
             using var client = new HttpClient();
+
             client.BaseAddress = new Uri("https://api.synk.hu/");
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", token);
 
             try
             {
                 var response = await client.GetAsync("users");
+
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync();
+
                 var usersResponse = JsonConvert.DeserializeObject<UsersResponse>(json);
+
                 return usersResponse;
             }
             catch (Exception ex)
@@ -120,13 +128,17 @@ namespace Dashboard
         private async Task LoadUsersAsync()
         {
             string token = App.Current.Properties["AuthToken"] as string;
+
             if (!string.IsNullOrEmpty(token))
             {
                 var usersResponse = await GetUsersAsync(token);
+
                 if (usersResponse != null && usersResponse.Items != null)
                 {
                     _usersViewSource = new CollectionViewSource();
+
                     _usersViewSource.Source = usersResponse.Items;
+
                     dataGrid.ItemsSource = _usersViewSource.View;
                 }
             }
@@ -142,16 +154,22 @@ namespace Dashboard
             {
                 _usersViewSource.View.Filter = item =>
                 {
-                    if (string.IsNullOrWhiteSpace(searchText)) return true;
+                    if (string.IsNullOrWhiteSpace(searchText))
+                        return true;
+
                     var user = item as User;
-                    if (user == null) return false;
 
-                    var searchTerms = searchText.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
-                                                .Select(term => term.Trim())
-                                                .Where(term => !string.IsNullOrEmpty(term))
-                                                .ToArray();
+                    if (user == null)
+                        return false;
 
-                    if (searchTerms.Length == 0) return true;
+                    var searchTerms = searchText
+                        .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(term => term.Trim())
+                        .Where(term => !string.IsNullOrEmpty(term))
+                        .ToArray();
+
+                    if (searchTerms.Length == 0)
+                        return true;
 
                     return searchTerms.All(term =>
                         user.FirstName.Contains(term, StringComparison.OrdinalIgnoreCase) ||
@@ -161,6 +179,7 @@ namespace Dashboard
                 };
             }
         }
+
         private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             FilterUsers(SearchBox.Text);
@@ -171,6 +190,7 @@ namespace Dashboard
             if (dataGrid.SelectedItem is User selectedUser)
             {
                 bool success = await SaveUserAsync(selectedUser);
+
                 if (success)
                 {
                     _usersViewSource?.View.Refresh();
@@ -185,6 +205,7 @@ namespace Dashboard
         private async Task<bool> SaveUserAsync(User user)
         {
             string token = App.Current.Properties["AuthToken"] as string;
+
             if (string.IsNullOrEmpty(token) || user == null)
             {
                 MessageBox.Show("No token or user selected.");
@@ -192,9 +213,14 @@ namespace Dashboard
             }
 
             using var client = new HttpClient();
+
             client.BaseAddress = new Uri("https://api.synk.hu/");
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", token);
+
+            client.DefaultRequestHeaders.Accept.Add(
+                new MediaTypeWithQualityHeaderValue("application/json"));
 
             var userPatch = new
             {
@@ -206,11 +232,16 @@ namespace Dashboard
             };
 
             var json = JsonConvert.SerializeObject(userPatch);
-            var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+            var content = new StringContent(
+                json,
+                System.Text.Encoding.UTF8,
+                "application/json");
 
             try
             {
                 var response = await client.PatchAsync($"users/{user.Id}", content);
+
                 if (response.IsSuccessStatusCode)
                 {
                     MessageBox.Show("User saved successfully!");
@@ -219,13 +250,16 @@ namespace Dashboard
                 else
                 {
                     var error = await response.Content.ReadAsStringAsync();
+
                     MessageBox.Show("Failed to save user: " + error);
+
                     return false;
                 }
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Error saving user: " + ex.Message);
+
                 return false;
             }
         }
@@ -233,9 +267,16 @@ namespace Dashboard
 
     public static class HttpClientExtensions
     {
-        public static Task<HttpResponseMessage> PatchAsync(this HttpClient client, string requestUri, HttpContent content)
+        public static Task<HttpResponseMessage> PatchAsync(
+            this HttpClient client,
+            string requestUri,
+            HttpContent content)
         {
-            var request = new HttpRequestMessage(new HttpMethod("PATCH"), requestUri) { Content = content };
+            var request = new HttpRequestMessage(
+                new HttpMethod("PATCH"),
+                requestUri)
+            { Content = content };
+
             return client.SendAsync(request);
         }
     }
