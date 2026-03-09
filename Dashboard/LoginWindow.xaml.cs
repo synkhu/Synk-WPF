@@ -1,189 +1,185 @@
-﻿using System.Net.Http;
-using System.Net.Http.Headers;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Windows;
-using System.Windows.Controls;
+using System.Windows.Input;
 
-namespace Dashboard
+namespace Dashboard;
+
+public partial class LoginWindow : Window
 {
-    /// <summary>
-    /// Interaction logic for LoginWindow.xaml
-    /// </summary>
-    public partial class LoginWindow : Window
+    private static readonly JsonSerializerOptions _jsonOptions = new()
     {
-        public LoginWindow()
+        PropertyNameCaseInsensitive = true,
+    };
+
+    public LoginWindow()
+    {
+        InitializeComponent();
+    }
+
+    private void MinimizeButton_Click(object sender, RoutedEventArgs e) =>
+        WindowState = WindowState.Minimized;
+
+    private void CloseButton_Click(object sender, RoutedEventArgs e) =>
+        Close();
+
+    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) =>
+        DragMove();
+
+    private async void LoginButton_Click(object sender, RoutedEventArgs e)
+    {
+        string email = EmailTextBox.Text.Trim();
+        string password = PasswordBox.Password;
+
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
         {
-            InitializeComponent();
+            MessageBox.Show("Please enter both email and password.", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
         }
 
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+        LoginButton.IsEnabled = false;
+
+        try
         {
-            this.WindowState = WindowState.Minimized;
-        }
-
-        private void CloseButton_Click(object sender, RoutedEventArgs e)
-        {
-            this.Close();
-        }
-
-        private void TitleBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            this.DragMove();
-        }
-
-        private async void LoginButton_Click(object sender, RoutedEventArgs e)
-        {
-            string email = EmailTextBox.Text;
-            string password = PasswordBox.Password;
-
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
-            {
-                MessageBox.Show("Enter both email and password.");
-                return;
-            }
-
-            LoginButton.IsEnabled = false;
-            bool loginSucceeded = await TryLogin(email, password);
-            LoginButton.IsEnabled = true;
-
+            bool loginSucceeded = await TryLoginAsync(email, password);
             if (!loginSucceeded)
                 return;
 
-            string token = App.Current.Properties["AuthToken"] as string;
-            var expiresAt = App.Current.Properties["TokenExpires"] as DateTime?;
-            if (expiresAt.HasValue && DateTime.Now >= expiresAt.Value)
+            // Client-side expiry check as an early-out. The server enforces the real boundary.
+            if (AuthSession.IsExpired)
             {
-                MessageBox.Show("Token expired. Please log in again.");
-                this.DialogResult = false;
+                MessageBox.Show("The session received from the server has already expired. Please try again.", "Session Expired", MessageBoxButton.OK, MessageBoxImage.Warning);
+                DialogResult = false;
                 return;
             }
 
-            bool isAdmin = await CheckAdminRoleAsync(token);
+            bool isAdmin = await CheckAdminRoleAsync();
 
-            if (isAdmin)
-            {
-                this.DialogResult = true;
-            }
-            else
-            {
-                MessageBox.Show("You do not have administrator rights.");
-                this.DialogResult = false;
-            }
+            if (!isAdmin)
+                MessageBox.Show("Access denied. An Administrator account is required.", "Access Denied", MessageBoxButton.OK, MessageBoxImage.Warning);
+
+            DialogResult = isAdmin;
         }
-
-        private async Task<bool> TryLogin(string email, string password)
+        finally
         {
-            using var client = new HttpClient();
-            client.BaseAddress = new Uri("https://api.synk.hu/");
-
-            var payload = new { email, password };
-            var json = JsonSerializer.Serialize(payload);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            try
-            {
-                var response = await client.PostAsync("auth/login", content);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    string responseBody = await response.Content.ReadAsStringAsync();
-                    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                    var data = JsonSerializer.Deserialize<LoginResponse>(responseBody, options);
-
-                    App.Current.Properties["AuthToken"] = data?.token;
-                    App.Current.Properties["TokenExpires"] = data?.expiresAt;
-
-                    return true;
-                }
-                else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized || response.StatusCode == System.Net.HttpStatusCode.BadRequest)
-                {
-                    MessageBox.Show("Invalid email or password.");
-                    return false;
-                }
-                else
-                {
-                    MessageBox.Show("Login failed: " + response.StatusCode);
-                    return false;
-                }
-            }
-            catch (HttpRequestException ex)
-            {
-                MessageBox.Show("Network error: " + ex.Message);
-                return false;
-            }
-            catch (JsonException)
-            {
-                MessageBox.Show("Error parsing server response.");
-                return false;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Unexpected error: " + ex.Message);
-                return false;
-            }
+            // Re-enable regardless of outcome so the user can retry without reopening the window.
+            LoginButton.IsEnabled = true;
         }
+    }
 
-        private async Task<bool> CheckAdminRoleAsync(string token)
+    private async Task<bool> TryLoginAsync(string email, string password)
+    {
+        var payload = JsonSerializer.Serialize(new { email, password });
+        var content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+        try
         {
-            using var client = new HttpClient();
-            client.BaseAddress = new Uri("https://api.synk.hu/");
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            var response = await ApiClient.Anonymous().PostAsync("auth/login", content);
 
-            try
+            if (response.IsSuccessStatusCode)
             {
-                var response = await client.GetAsync("users/me");
+                var body = await response.Content.ReadAsStringAsync();
+                var data = JsonSerializer.Deserialize<LoginResponse>(body, _jsonOptions);
 
-                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                {
-                    MessageBox.Show("Session expired. Please log in again.");
-                    return false;
-                }
-                else if (!response.IsSuccessStatusCode)
-                {
-                    MessageBox.Show("Failed to get user role: " + response.StatusCode);
-                    return false;
-                }
+                AuthSession.Token = data?.Token;
+                AuthSession.ExpiresAt = data?.ExpiresAt;
 
-                var json = await response.Content.ReadAsStringAsync();
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                var user = JsonSerializer.Deserialize<UserResponse>(json, options);
-
-                return user != null && string.Equals(user.role, "Administrator", StringComparison.OrdinalIgnoreCase);
+                return true;
             }
-            catch (HttpRequestException ex)
+
+            // Both 400 and 401 indicate bad credentials from this endpoint.
+            if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized
+                                    or System.Net.HttpStatusCode.BadRequest)
             {
-                MessageBox.Show("Network error: " + ex.Message);
+                MessageBox.Show("Invalid email or password.", "Login Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
-            catch (JsonException)
-            {
-                MessageBox.Show("Error parsing server response.");
-                return false;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Unexpected error: " + ex.Message);
-                return false;
-            }
+
+            MessageBox.Show($"Unexpected server response: {(int)response.StatusCode} {response.ReasonPhrase}", "Login Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
+        }
+        catch (HttpRequestException ex)
+        {
+            MessageBox.Show($"Network error: {ex.Message}", "Connection Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
+        }
+        catch (JsonException)
+        {
+            MessageBox.Show("The server returned an unexpected response format.", "Parse Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
         }
     }
 
-    public class LoginResponse
+    private async Task<bool> CheckAdminRoleAsync()
     {
-        public string? token { get; set; }
-        public DateTime? expiresAt { get; set; }
-    }
+        try
+        {
+            var response = await ApiClient.WithAuth().GetAsync("users/me");
 
-    public class UserResponse
-    {
-        public string? id { get; set; }
-        public string? email { get; set; }
-        public string? firstName { get; set; }
-        public string? lastName { get; set; }
-        public string? profilePictureUrl { get; set; }
-        public string? role { get; set; }
-        public bool emailVerified { get; set; }
-        public DateTime createdAt { get; set; }
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                MessageBox.Show("Session expired immediately after login. Please try again.", "Session Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                MessageBox.Show($"Failed to retrieve user profile: {(int)response.StatusCode} {response.ReasonPhrase}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            var user = JsonSerializer.Deserialize<UserProfile>(json, _jsonOptions);
+
+            return string.Equals(user?.Role, "Administrator", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (HttpRequestException ex)
+        {
+            MessageBox.Show($"Network error while verifying role: {ex.Message}", "Connection Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
+        }
+        catch (JsonException)
+        {
+            MessageBox.Show("The server returned an unexpected response format.", "Parse Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
+        }
     }
+}
+
+internal sealed class LoginResponse
+{
+    [JsonPropertyName("token")]
+    public string? Token { get; init; }
+
+    [JsonPropertyName("expiresAt")]
+    public DateTime? ExpiresAt { get; init; }
+}
+
+internal sealed class UserProfile
+{
+    [JsonPropertyName("id")]
+    public string? Id { get; init; }
+
+    [JsonPropertyName("email")]
+    public string? Email { get; init; }
+
+    [JsonPropertyName("firstName")]
+    public string? FirstName { get; init; }
+
+    [JsonPropertyName("lastName")]
+    public string? LastName { get; init; }
+
+    [JsonPropertyName("profilePictureUrl")]
+    public string? ProfilePictureUrl { get; init; }
+
+    [JsonPropertyName("role")]
+    public string? Role { get; init; }
+
+    [JsonPropertyName("emailVerified")]
+    public bool EmailVerified { get; init; }
+
+    [JsonPropertyName("createdAt")]
+    public DateTime CreatedAt { get; init; }
 }

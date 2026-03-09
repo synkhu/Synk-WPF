@@ -1,306 +1,285 @@
-﻿using System.Net.Http;
-using System.Net.Http.Headers;
+using System.Globalization;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using Newtonsoft.Json;
+using System.Windows.Input;
 
-namespace Dashboard
+namespace Dashboard;
+
+public partial class MainWindow : Window
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
-    public partial class MainWindow : Window
+    private static readonly JsonSerializerOptions _jsonOptions = new()
     {
-        private bool IsLoggingOut = false;
-        private CollectionViewSource _usersViewSource;
-        public List<string> Roles { get; } = new List<string> { "Administrator", "Organizer", "Customer" };
+        PropertyNameCaseInsensitive = true,
+    };
 
-        public MainWindow()
+    // Distinguishes an explicit logout (→ show login again) from the user closing
+    // the window directly (→ revoke token server-side, then shut down).
+    private bool _isLoggingOut;
+
+    private CollectionViewSource? _usersViewSource;
+
+    public List<string> Roles { get; } = ["Administrator", "Organizer", "Customer"];
+
+    // Drives the EmailVerified ComboBox; bound via SelectedItem directly to the bool property.
+    public List<bool> VerificationOptions { get; } = [true, false];
+
+    public MainWindow()
+    {
+        InitializeComponent();
+        LogoutButton.Click += LogoutButton_Click;
+        Closed += MainWindow_Closed;
+        SearchBox.TextChanged += SearchBox_TextChanged;
+        SaveButton.Click += SaveButton_Click;
+        _ = LoadUsersAsync();
+    }
+
+    private void MinimizeButton_Click(object sender, RoutedEventArgs e) =>
+        WindowState = WindowState.Minimized;
+
+    private void CloseButton_Click(object sender, RoutedEventArgs e) =>
+        Close();
+
+    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) =>
+        DragMove();
+
+    private async void LogoutButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(AuthSession.Token))
+            await LogoutFromServerAsync();
+
+        AuthSession.Clear();
+        _isLoggingOut = true;
+        Close();
+    }
+
+    private async void MainWindow_Closed(object sender, EventArgs e)
+    {
+        // If the window was closed without the logout button (e.g. Alt+F4 or the title bar X),
+        // we still need to revoke the token on the server before exiting.
+        if (!_isLoggingOut && !string.IsNullOrEmpty(AuthSession.Token))
+            await LogoutFromServerAsync();
+
+        AuthSession.Clear();
+
+        if (_isLoggingOut)
+            ((App)Application.Current).StartLoginFlow();
+        else
+            Application.Current.Shutdown();
+    }
+
+    private async Task LogoutFromServerAsync()
+    {
+        try
         {
-            InitializeComponent();
-            LogoutButton.Click += LogoutButton_Click;
-            Closed += MainWindow_Closed;
-            SearchBox.TextChanged += SearchBox_TextChanged;
-            SaveButton.Click += SaveButton_Click;
-            _ = LoadUsersAsync();
+            // The response body is irrelevant; we only care that the server invalidates the token.
+            await ApiClient.WithAuth().PostAsync("auth/logout", content: null);
+        }
+        catch (HttpRequestException ex)
+        {
+            // A failed server-side logout does not block the local session from being cleared.
+            MessageBox.Show(
+                $"Server logout failed: {ex.Message}\nYour local session has been cleared.",
+                "Logout Warning",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        if (string.IsNullOrEmpty(AuthSession.Token))
+        {
+            MessageBox.Show("Authentication token missing. Please log in again.", "Session Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
         }
 
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+        var usersResponse = await FetchUsersAsync();
+
+        if (usersResponse?.Items is not { Count: > 0 } items)
+            return;
+
+        _usersViewSource = new CollectionViewSource { Source = items };
+        dataGrid.ItemsSource = _usersViewSource.View;
+    }
+
+    private async Task<UsersResponse?> FetchUsersAsync()
+    {
+        try
         {
-            WindowState = WindowState.Minimized;
+            var response = await ApiClient.WithAuth().GetAsync("users");
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<UsersResponse>(json, _jsonOptions);
         }
-
-        private void CloseButton_Click(object sender, RoutedEventArgs e)
+        catch (HttpRequestException ex)
         {
-            Close();
+            MessageBox.Show($"Failed to load users: {ex.Message}", "Network Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            return null;
         }
-
-        private void TitleBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        catch (JsonException)
         {
-            DragMove();
+            MessageBox.Show("The server returned an unexpected response format.", "Parse Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            return null;
         }
+    }
 
-        private async void LogoutButton_Click(object sender, RoutedEventArgs e)
+    private void FilterUsers(string searchText)
+    {
+        if (_usersViewSource?.View is null)
+            return;
+
+        _usersViewSource.View.Filter = item =>
         {
-            string token = App.Current.Properties["AuthToken"] as string;
+            if (string.IsNullOrWhiteSpace(searchText))
+                return true;
 
-            if (!string.IsNullOrEmpty(token))
-            {
-                await LogoutFromServerAsync(token);
-            }
-
-            App.Current.Properties["AuthToken"] = null;
-            App.Current.Properties["TokenExpires"] = null;
-
-            IsLoggingOut = true;
-            Close();
-        }
-
-        private async void MainWindow_Closed(object sender, EventArgs e)
-        {
-            string token = App.Current.Properties["AuthToken"] as string;
-
-            if (!string.IsNullOrEmpty(token))
-            {
-                await LogoutFromServerAsync(token);
-            }
-
-            App.Current.Properties["AuthToken"] = null;
-            App.Current.Properties["TokenExpires"] = null;
-
-            if (IsLoggingOut)
-            {
-                var app = (App)Application.Current;
-                app.StartLoginFlow();
-            }
-            else
-            {
-                Application.Current.Shutdown();
-            }
-        }
-
-        private async Task LogoutFromServerAsync(string token)
-        {
-            using var client = new HttpClient();
-
-            client.BaseAddress = new Uri("https://api.synk.hu/");
-            client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", token);
-
-            try
-            {
-                await client.PostAsync("auth/logout", null);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Logout failed: " + ex.Message);
-            }
-        }
-
-        private async Task<UsersResponse> GetUsersAsync(string token)
-        {
-            using var client = new HttpClient();
-
-            client.BaseAddress = new Uri("https://api.synk.hu/");
-            client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", token);
-
-            try
-            {
-                var response = await client.GetAsync("users");
-
-                response.EnsureSuccessStatusCode();
-
-                var json = await response.Content.ReadAsStringAsync();
-
-                var usersResponse = JsonConvert.DeserializeObject<UsersResponse>(json);
-
-                return usersResponse;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Failed to get users: " + ex.Message);
-                return null;
-            }
-        }
-
-        private async Task LoadUsersAsync()
-        {
-            string token = App.Current.Properties["AuthToken"] as string;
-
-            if (!string.IsNullOrEmpty(token))
-            {
-                var usersResponse = await GetUsersAsync(token);
-
-                if (usersResponse != null && usersResponse.Items != null)
-                {
-                    _usersViewSource = new CollectionViewSource();
-
-                    _usersViewSource.Source = usersResponse.Items;
-
-                    dataGrid.ItemsSource = _usersViewSource.View;
-                }
-            }
-            else
-            {
-                MessageBox.Show("No authentication token available. Please log in.");
-            }
-        }
-
-        private void FilterUsers(string searchText)
-        {
-            if (_usersViewSource?.View != null)
-            {
-                _usersViewSource.View.Filter = item =>
-                {
-                    if (string.IsNullOrWhiteSpace(searchText))
-                        return true;
-
-                    var user = item as User;
-
-                    if (user == null)
-                        return false;
-
-                    var searchTerms = searchText
-                        .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
-                        .Select(term => term.Trim())
-                        .Where(term => !string.IsNullOrEmpty(term))
-                        .ToArray();
-
-                    if (searchTerms.Length == 0)
-                        return true;
-
-                    return searchTerms.All(term =>
-                        user.FirstName.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                        user.LastName.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                        user.Email.Contains(term, StringComparison.OrdinalIgnoreCase) ||
-                        user.Role.Contains(term, StringComparison.OrdinalIgnoreCase));
-                };
-            }
-        }
-
-        private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            FilterUsers(SearchBox.Text);
-        }
-
-        private async void SaveButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (dataGrid.SelectedItem is User selectedUser)
-            {
-                bool success = await SaveUserAsync(selectedUser);
-
-                if (success)
-                {
-                    _usersViewSource?.View.Refresh();
-                }
-            }
-            else
-            {
-                MessageBox.Show("Please select a user to save.");
-            }
-        }
-
-        private async Task<bool> SaveUserAsync(User user)
-        {
-            string token = App.Current.Properties["AuthToken"] as string;
-
-            if (string.IsNullOrEmpty(token) || user == null)
-            {
-                MessageBox.Show("No token or user selected.");
+            if (item is not User user)
                 return false;
-            }
 
-            using var client = new HttpClient();
+            // Each space-separated term must match at least one field — supports "John Smith" queries.
+            var terms = searchText.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-            client.BaseAddress = new Uri("https://api.synk.hu/");
-
-            client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", token);
-
-            client.DefaultRequestHeaders.Accept.Add(
-                new MediaTypeWithQualityHeaderValue("application/json"));
-
-            var userPatch = new
-            {
-                firstName = user.FirstName,
-                lastName = user.LastName,
-                email = user.Email,
-                profilePictureUrl = user.ProfilePictureUrl,
-                role = user.Role
-            };
-
-            var json = JsonConvert.SerializeObject(userPatch);
-
-            var content = new StringContent(
-                json,
-                System.Text.Encoding.UTF8,
-                "application/json");
-
-            try
-            {
-                var response = await client.PatchAsync($"users/{user.Id}", content);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    MessageBox.Show("User saved successfully!");
-                    return true;
-                }
-                else
-                {
-                    var error = await response.Content.ReadAsStringAsync();
-
-                    MessageBox.Show("Failed to save user: " + error);
-
-                    return false;
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error saving user: " + ex.Message);
-
-                return false;
-            }
-        }
+            return terms.All(term =>
+                (user.FirstName?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (user.LastName?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (user.Email?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (user.Role?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false));
+        };
     }
 
-    public static class HttpClientExtensions
+    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) =>
+        FilterUsers(SearchBox.Text);
+
+    private async void SaveButton_Click(object sender, RoutedEventArgs e)
     {
-        public static Task<HttpResponseMessage> PatchAsync(
-            this HttpClient client,
-            string requestUri,
-            HttpContent content)
+        if (dataGrid.SelectedItem is not User selectedUser)
         {
-            var request = new HttpRequestMessage(
-                new HttpMethod("PATCH"),
-                requestUri)
-            { Content = content };
+            MessageBox.Show("Select a user row before saving.", "No Selection", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
 
-            return client.SendAsync(request);
+        bool success = await SaveUserAsync(selectedUser);
+
+        if (success)
+            _usersViewSource?.View.Refresh();
+    }
+
+    private async Task<bool> SaveUserAsync(User user)
+    {
+        if (string.IsNullOrEmpty(AuthSession.Token))
+        {
+            MessageBox.Show("Authentication token missing. Please log in again.", "Session Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
+        }
+
+        // Only send the fields the API accepts for a PATCH; omit read-only fields like Id and CreatedAt.
+        var patch = new
+        {
+            firstName = user.FirstName,
+            lastName = user.LastName,
+            email = user.Email,
+            profilePictureUrl = user.ProfilePictureUrl,
+            role = user.Role,
+        };
+
+        var content = new StringContent(
+            JsonSerializer.Serialize(patch),
+            Encoding.UTF8,
+            "application/json");
+
+        try
+        {
+            var response = await ApiClient.WithAuth().PatchAsync($"users/{user.Id}", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                MessageBox.Show("User saved successfully.", "Saved", MessageBoxButton.OK, MessageBoxImage.Information);
+                return true;
+            }
+
+            var error = await response.Content.ReadAsStringAsync();
+            MessageBox.Show($"Failed to save user ({(int)response.StatusCode}): {error}", "Save Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
+        }
+        catch (HttpRequestException ex)
+        {
+            MessageBox.Show($"Network error while saving: {ex.Message}", "Connection Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
         }
     }
+}
 
-    public class User
-    {
-        public string Id { get; set; }
-        public string Email { get; set; }
-        public string FirstName { get; set; }
-        public string LastName { get; set; }
-        public string ProfilePictureUrl { get; set; }
-        public string Role { get; set; }
-        public bool EmailVerified { get; set; }
-        public DateTime CreatedAt { get; set; }
-    }
+/// <summary>
+/// Maps <see cref="bool"/> EmailVerified values to their display strings and back.
+/// Used by the Verification ComboBox so items show "Verified" / "Unverified" instead of True / False.
+/// </summary>
+[ValueConversion(typeof(bool), typeof(string))]
+internal sealed class BoolToVerifiedConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is true ? "Verified" : "Unverified";
 
-    public class UsersResponse
-    {
-        public List<User> Items { get; set; }
-        public int Page { get; set; }
-        public int PageSize { get; set; }
-        public int TotalItems { get; set; }
-        public int TotalPages { get; set; }
-        public bool HasPreviousPage { get; set; }
-        public bool HasNextPage { get; set; }
-    }
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is "Verified";
+}
+
+/// <summary>
+/// Represents a single user record returned by the Synk API.
+/// Properties are mutable so the DataGrid can write back edited values in-place.
+/// </summary>
+public class User
+{
+    [JsonPropertyName("id")]
+    public string? Id { get; set; }
+
+    [JsonPropertyName("email")]
+    public string? Email { get; set; }
+
+    [JsonPropertyName("firstName")]
+    public string? FirstName { get; set; }
+
+    [JsonPropertyName("lastName")]
+    public string? LastName { get; set; }
+
+    [JsonPropertyName("profilePictureUrl")]
+    public string? ProfilePictureUrl { get; set; }
+
+    [JsonPropertyName("role")]
+    public string? Role { get; set; }
+
+    [JsonPropertyName("emailVerified")]
+    public bool EmailVerified { get; set; }
+
+    [JsonPropertyName("createdAt")]
+    public DateTime CreatedAt { get; set; }
+}
+
+internal sealed class UsersResponse
+{
+    [JsonPropertyName("items")]
+    public List<User>? Items { get; init; }
+
+    [JsonPropertyName("page")]
+    public int Page { get; init; }
+
+    [JsonPropertyName("pageSize")]
+    public int PageSize { get; init; }
+
+    [JsonPropertyName("totalItems")]
+    public int TotalItems { get; init; }
+
+    [JsonPropertyName("totalPages")]
+    public int TotalPages { get; init; }
+
+    [JsonPropertyName("hasPreviousPage")]
+    public bool HasPreviousPage { get; init; }
+
+    [JsonPropertyName("hasNextPage")]
+    public bool HasNextPage { get; init; }
 }
