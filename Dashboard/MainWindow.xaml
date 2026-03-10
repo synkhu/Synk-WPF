@@ -92,6 +92,7 @@
                     <TextBox x:Name="SearchBox" Style="{StaticResource RoundedTextBox}"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Grid.Column="1" HorizontalAlignment="Right">
+                    <Button x:Name="RefreshButton" Style="{StaticResource RoundedButton}" Margin="0">Refresh</Button>
                     <Button x:Name="SaveButton" Style="{StaticResource RoundedButton}" Margin="0">Save changes</Button>
                     <Button x:Name="LogoutButton" Style="{StaticResource RoundedButton}">Logout</Button>
                 </StackPanel>
