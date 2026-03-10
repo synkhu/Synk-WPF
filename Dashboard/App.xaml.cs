@@ -1,42 +1,44 @@
-﻿using System.Windows;
+using System.Windows;
 
-namespace Dashboard
+namespace Dashboard;
+
+public partial class App : Application
 {
-    /// <summary>
-    /// Interaction logic for App.xaml
-    /// </summary>
-    public partial class App : Application
+    protected override void OnStartup(StartupEventArgs e)
     {
-        protected override void OnStartup(StartupEventArgs e)
+        // Keep the app alive while we transition between the login window and the main window.
+        // Without this, closing the login dialog would shut down the process before Main opens.
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        base.OnStartup(e);
+        StartLoginFlow();
+    }
+
+    internal void StartLoginFlow()
+    {
+        var login = new LoginWindow();
+
+        if (login.ShowDialog() != true)
         {
-            ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            
-            base.OnStartup(e);
-            StartLoginFlow();
+            Shutdown();
+            return;
         }
 
-        public void StartLoginFlow()
+        try
         {
-            var login = new LoginWindow();
-            bool? result = login.ShowDialog();
+            var main = new MainWindow();
+            MainWindow = main;
+            main.Show();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Failed to open the dashboard: {ex.Message}",
+                "Startup Error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
 
-            if (result == true)
-            {
-                try
-                {
-                    var main = new MainWindow();
-                    this.MainWindow = main;
-                    main.Show();
-                }
-                catch (Exception ex)
-                {
-                    Shutdown();
-                }
-            }
-            else
-            {
-                Shutdown();
-            }
+            Shutdown();
         }
     }
 }
