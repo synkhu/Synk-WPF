@@ -1,6 +1,6 @@
 using System.Windows;
 
-namespace Dashboard;
+namespace Dashboard.Views;
 
 public partial class App : Application
 {
