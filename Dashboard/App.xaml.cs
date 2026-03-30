@@ -1,5 +1,8 @@
 using System;
 using System.Windows;
+using Dashboard.Services;
+using Dashboard.ViewModels;
+using Dashboard.Views;
 
 namespace Dashboard
 {
@@ -19,7 +22,9 @@ namespace Dashboard
             {
                 AuthSession.Clear();
 
-                var loginWindow = new Views.LoginWindow();
+                var loginVm = new LoginViewModel(new AuthService());
+                var loginWindow = new LoginWindow(loginVm);
+
                 bool? loginResult = loginWindow.ShowDialog();
 
                 if (loginResult != true)
@@ -28,16 +33,15 @@ namespace Dashboard
                     return;
                 }
 
-                var mainWindow = new Views.MainWindow();
-                MainWindow = mainWindow;
+                var mainVm = new MainViewModel(new UserService());
 
-                if (mainWindow.DataContext is ViewModels.MainViewModel vm)
+                var mainWindow = new MainWindow(mainVm);
+
+                MainWindow = mainWindow;
+                mainVm.OnLogoutRequested = () =>
                 {
-                    vm.OnLogoutRequested = () =>
-                    {
-                        mainWindow.Close();
-                    };
-                }
+                    mainWindow.Close();
+                };
 
                 mainWindow.ShowDialog();
 

@@ -11,10 +11,6 @@
         WindowStyle="None" AllowsTransparency="True"
         MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
 
-    <Window.DataContext>
-        <vm:MainViewModel/>
-    </Window.DataContext>
-
     <Window.Resources>
         <local:BoolToVerifiedConverter x:Key="BoolToVerifiedConverter"/>
         <Style x:Key="RoundedButton" TargetType="Button">

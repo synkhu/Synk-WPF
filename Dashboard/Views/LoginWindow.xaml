@@ -11,10 +11,6 @@
         WindowStyle="None" AllowsTransparency="True"
         MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
 
-    <Window.DataContext>
-        <vm:LoginViewModel/>
-    </Window.DataContext>
-
     <Grid>
         <Border Background="#282828" Height="30" VerticalAlignment="Top">
             <Grid>

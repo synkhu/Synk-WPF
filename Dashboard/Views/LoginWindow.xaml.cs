@@ -1,24 +1,24 @@
 using System.Windows;
 using System.Windows.Input;
+using Dashboard.ViewModels;
 
 namespace Dashboard.Views;
 
 public partial class LoginWindow : Window
 {
-    public LoginWindow()
+    public LoginWindow(LoginViewModel vm)
     {
         InitializeComponent();
 
-        if (DataContext is ViewModels.LoginViewModel vm)
-        {
-            vm.ShowErrorMessage += message =>
-                MessageBox.Show(message, "Login Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+        DataContext = vm;
 
-            vm.OnLoginSucceeded += () =>
-            {
-                DialogResult = true;
-            };
-        }
+        vm.ShowErrorMessage += message =>
+            MessageBox.Show(message, "Login Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+
+        vm.OnLoginSucceeded += () =>
+        {
+            DialogResult = true;
+        };
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) =>
@@ -32,7 +32,7 @@ public partial class LoginWindow : Window
 
     private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
     {
-        if (DataContext is ViewModels.LoginViewModel vm)
+        if (DataContext is LoginViewModel vm)
         {
             vm.Password = PasswordBox.Password;
         }
