@@ -15,7 +15,7 @@ namespace Dashboard.ViewModels;
 
 public class MainViewModel : BaseViewModel
 {
-    private readonly UserService _userService = new();
+    private readonly IUserService _userService;
     private readonly HashSet<string> _dirtyUserIds = new();
 
     private CollectionViewSource? _usersViewSource;
@@ -40,14 +40,16 @@ public class MainViewModel : BaseViewModel
         }
     }
 
-    public ICommand RefreshCommand { get; }
-    public ICommand SaveCommand { get; }
+    public IAsyncRelayCommand RefreshCommand { get; }
+    public IAsyncRelayCommand SaveCommand { get; }
     public IAsyncRelayCommand LogoutCommand { get; }
 
-    public MainViewModel()
+    public MainViewModel(IUserService? userService = null)
     {
-        RefreshCommand = new RelayCommand(async _ => await RefreshAsync());
-        SaveCommand = new RelayCommand(async _ => await SaveAsync());
+        _userService = userService ?? new UserService();
+
+        RefreshCommand = new AsyncRelayCommand(RefreshAsync);
+        SaveCommand = new AsyncRelayCommand(SaveAsync);
         LogoutCommand = new AsyncRelayCommand(LogoutAsync);
 
         _ = LoadUsersAsync();

@@ -6,7 +6,7 @@ using Dashboard.Models;
 
 namespace Dashboard.Services
 {
-    public class UserService
+    public class UserService : IUserService
     {
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
@@ -33,10 +33,10 @@ namespace Dashboard.Services
             }
         }
 
-        public async Task<(bool Success, string? Error)> SaveUserAsync(User user)
+        public async Task SaveUserAsync(User user)
         {
             if (string.IsNullOrEmpty(AuthSession.Token))
-                return (false, "Authentication token missing.");
+                throw new HttpRequestException("Authentication token missing.");
 
             var patch = new
             {
@@ -54,15 +54,15 @@ namespace Dashboard.Services
             {
                 var response = await ApiClient.WithAuth().PatchAsync($"users/{user.Id}", content);
 
-                if (response.IsSuccessStatusCode)
-                    return (true, null);
-
-                var error = await response.Content.ReadAsStringAsync();
-                return (false, $"Failed to save user ({(int)response.StatusCode}): {error}");
+                if (!response.IsSuccessStatusCode)
+                {
+                    var error = await response.Content.ReadAsStringAsync();
+                    throw new HttpRequestException($"Failed to save user ({(int)response.StatusCode}): {error}");
+                }
             }
             catch (HttpRequestException ex)
             {
-                return (false, $"Network error while saving: {ex.Message}");
+                throw new HttpRequestException($"Network error while saving: {ex.Message}", ex);
             }
         }
     }
