@@ -6,14 +6,14 @@ using Dashboard.Models;
 
 namespace Dashboard.Services
 {
-    public class AuthService
+    public class AuthService : IAuthService
     {
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
             PropertyNameCaseInsensitive = true,
         };
 
-        public async Task<(bool Success, string? Error)> LoginAsync(string email, string password)
+        public async Task<(bool loginSucceeded, string? errorMessage)> LoginAsync(string email, string password)
         {
             var payload = JsonSerializer.Serialize(new { email, password });
             var content = new StringContent(payload, Encoding.UTF8, "application/json");
@@ -51,7 +51,7 @@ namespace Dashboard.Services
             }
         }
 
-        public async Task<(bool IsAdmin, string? Error)> CheckAdminAsync()
+        public async Task<(bool isAdmin, string? errorMessage)> CheckAdminAsync()
         {
             try
             {

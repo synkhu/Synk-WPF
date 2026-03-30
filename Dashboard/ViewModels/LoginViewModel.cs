@@ -10,7 +10,7 @@ namespace Dashboard.ViewModels;
 
 public class LoginViewModel : INotifyPropertyChanged
 {
-    private readonly AuthService _authService = new();
+    private readonly IAuthService _authService;
     private string _email = string.Empty;
     private string _password = string.Empty;
     private bool _isLoggingIn;
@@ -46,9 +46,10 @@ public class LoginViewModel : INotifyPropertyChanged
 
     public event Action<string>? ShowErrorMessage;
 
-    public LoginViewModel()
+    public LoginViewModel(IAuthService? authService = null)
     {
-        LoginCommand = new AsyncRelayCommand(LoginAsync, () => !IsLoggingIn);
+        _authService = authService ?? new AuthService(); // still works normally
+        LoginCommand = new CommunityToolkit.Mvvm.Input.AsyncRelayCommand(LoginAsync, () => !IsLoggingIn);
     }
 
     protected void OnPropertyChanged([CallerMemberName] string? name = null) =>
