@@ -13,9 +13,6 @@ namespace Dashboard.Services
             PropertyNameCaseInsensitive = true,
         };
 
-        /// <summary>
-        /// Fetch all users from the API.
-        /// </summary>
         public async Task<UsersResponse?> GetUsersAsync()
         {
             try
@@ -28,19 +25,14 @@ namespace Dashboard.Services
             }
             catch (HttpRequestException)
             {
-                // Optionally log or handle network errors
                 return null;
             }
             catch (JsonException)
             {
-                // Optionally log or handle parse errors
                 return null;
             }
         }
 
-        /// <summary>
-        /// Save an individual user via PATCH.
-        /// </summary>
         public async Task<(bool Success, string? Error)> SaveUserAsync(User user)
         {
             if (string.IsNullOrEmpty(AuthSession.Token))
