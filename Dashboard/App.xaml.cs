@@ -1,44 +1,55 @@
+using System;
 using System.Windows;
+using Dashboard.Services;
+using Dashboard.ViewModels;
+using Dashboard.Views;
 
-namespace Dashboard;
-
-public partial class App : Application
+namespace Dashboard
 {
-    protected override void OnStartup(StartupEventArgs e)
+    public partial class App : Application
     {
-        // Keep the app alive while we transition between the login window and the main window.
-        // Without this, closing the login dialog would shut down the process before Main opens.
-        ShutdownMode = ShutdownMode.OnExplicitShutdown;
-
-        base.OnStartup(e);
-        StartLoginFlow();
-    }
-
-    internal void StartLoginFlow()
-    {
-        var login = new LoginWindow();
-
-        if (login.ShowDialog() != true)
+        protected override void OnStartup(StartupEventArgs e)
         {
-            Shutdown();
-            return;
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            base.OnStartup(e);
+
+            StartLoginFlow();
         }
 
-        try
+        private void StartLoginFlow()
         {
-            var main = new MainWindow();
-            MainWindow = main;
-            main.Show();
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(
-                $"Failed to open the dashboard: {ex.Message}",
-                "Startup Error",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+            while (true)
+            {
+                AuthSession.Clear();
 
-            Shutdown();
+                var loginVm = new LoginViewModel(new AuthService());
+                var loginWindow = new LoginWindow(loginVm);
+
+                bool? loginResult = loginWindow.ShowDialog();
+
+                if (loginResult != true)
+                {
+                    Shutdown();
+                    return;
+                }
+
+                var mainVm = new MainViewModel(new UserService());
+
+                var mainWindow = new MainWindow(mainVm);
+
+                MainWindow = mainWindow;
+                mainVm.OnLogoutRequested = () =>
+                {
+                    mainWindow.Close();
+                };
+
+                mainWindow.ShowDialog();
+
+                if (AuthSession.Token == null)
+                    continue;
+
+                break;
+            }
         }
     }
 }
