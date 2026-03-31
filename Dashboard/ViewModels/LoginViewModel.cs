@@ -48,7 +48,7 @@ public class LoginViewModel : INotifyPropertyChanged
 
     public LoginViewModel(IAuthService? authService = null)
     {
-        _authService = authService ?? new AuthService(); // still works normally
+        _authService = authService ?? new AuthService();
         LoginCommand = new CommunityToolkit.Mvvm.Input.AsyncRelayCommand(LoginAsync, () => !IsLoggingIn);
     }
 
